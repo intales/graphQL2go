@@ -24,44 +24,52 @@ type GraphQLEnum struct {
 }
 
 func ParseGraphQLSchema(schemaString string) ([]GraphQLType, []GraphQLEnum, error) {
+	var schemaTypes []GraphQLType
+	var schemaEnums []GraphQLEnum
+
 	astDoc, err := parser.Parse(parser.ParseParams{
 		Source: schemaString,
 	})
-	var schemaTypes []GraphQLType
-	var schemaEnums []GraphQLEnum
 
 	if err != nil {
 		return schemaTypes, schemaEnums, err
 	}
 
-	for _, def := range astDoc.Definitions {
-
-		switch def := def.(type) {
+	for _, definition := range astDoc.Definitions {
+		switch typeDefinition := definition.(type) {
 		case *ast.ObjectDefinition:
-			var fields []GraphQLField
-			for _, field := range def.Fields {
-				fields = append(fields, GraphQLField{
-					Name: field.Name.Value,
-					Type: getTypeString(field.Type),
-				})
-			}
-			schemaTypes = append(schemaTypes, GraphQLType{
-				Name:   def.Name.Value,
-				Fields: fields,
-			})
+			schemaTypes = append(schemaTypes, parseGraphQLFields(typeDefinition))
 		case *ast.EnumDefinition:
-			var values []string
-			for _, enumValue := range def.Values {
-				values = append(values, enumValue.Name.Value)
-			}
-			schemaEnums = append(schemaEnums, GraphQLEnum{
-				Name:   def.Name.Value,
-				Values: values,
-			})
+			schemaEnums = append(schemaEnums, parseGraphQLEnums(typeDefinition))
 		}
 	}
 
 	return schemaTypes, schemaEnums, nil
+}
+
+func parseGraphQLFields(def *ast.ObjectDefinition) GraphQLType {
+	var fields []GraphQLField
+	for _, field := range def.Fields {
+		fields = append(fields, GraphQLField{
+			Name: field.Name.Value,
+			Type: getTypeString(field.Type),
+		})
+	}
+	return GraphQLType{
+		Name:   def.Name.Value,
+		Fields: fields,
+	}
+}
+
+func parseGraphQLEnums(def *ast.EnumDefinition) GraphQLEnum {
+	var values []string
+	for _, enumValue := range def.Values {
+		values = append(values, enumValue.Name.Value)
+	}
+	return GraphQLEnum{
+		Name:   def.Name.Value,
+		Values: values,
+	}
 }
 
 func getTypeString(t ast.Type) string {
